@@ -157,40 +157,47 @@ if st.button('View Visualizations', on_click=toggle_buttons):
     pass
 
 if st.session_state.show_buttons:
-    #col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
 
-    #with col1:
-    if st.button('a. Dataset head()'):
-        notebook_cell_1()
+    with col1:
+        if st.button('a. Dataset head()'):
+            notebook_cell_1()
 
-    #with col2:
-    if st.button('b. Dataset shape'):
-        notebook_cell_2()
+    with col2:
+        if st.button('b. Dataset shape'):
+            notebook_cell_2()
 
-    #with col3:
-    if st.button('c. 5 Point Data Summary'):
-        notebook_cell_3()
+    with col1:
+        if st.button('c. 5 Point Data Summary'):
+            notebook_cell_3()
 
-    if st.button('d. Rating Distribution'):
-        notebook_cell_4()
+    with col2:    
+        if st.button('d. Rating Distribution'):
+            notebook_cell_4()
 
-    if st.button('e. Top Rating Count Distribution grouped by Products'):
-        notebook_cell_5()
+    with col1:
+        if st.button('e. Top Rating Count grouped by Products'):
+            notebook_cell_5()
 
-    if st.button('f. Top Rating Count Distribution grouped by Users'):
-        notebook_cell_6()
+    with col2: 
+        if st.button('f. Top Rating Count grouped by Users'):
+            notebook_cell_6()
 
-    if st.button('g. Mean Rating Distribution grouped by Products'):
-        notebook_cell_7()
+    with col1: 
+        if st.button('g. Mean Rating grouped by Products'):
+            notebook_cell_7()
 
-    if st.button('h. Mean Rating - Rating Count Distribution grouped by Products'):
-        notebook_cell_8()
+    with col2: 
+        if st.button('h. Mean Rating(Count) grouped by Products'):
+            notebook_cell_8()
 
-    if st.button('i. Mean Rating Distribution grouped by Users'):
-        notebook_cell_9()
+    with col1: 
+        if st.button('i. Mean Rating grouped by Users'):
+            notebook_cell_9()
 
-    if st.button('j. Mean Rating - Rating Count Distribution grouped by Users'):
-        notebook_cell_10()
+    with col2:
+        if st.button('j. Mean Rating(Count) grouped by Users'):
+            notebook_cell_10()
 
 
 
@@ -263,41 +270,173 @@ def notebook_cell_11():
             return rmse
     pr = popularity_based_recommender_model(train_data=train_data, test_data=test_data, user_id='userId', item_id='productId')
     pr.fit()
-    result_pop_user1 = pr.recommend('ANTN61S4L7WG9')
+    
+    #result_pop_user1 = pr.recommend('ANTN61S4L7WG9')
+    result_pop_user1 = pr.recommend(user_input1)
     st.write(result_pop_user1)
-    result_pop_user2 = pr.recommend('AYNAH993VDECT')
-    st.write(result_pop_user2)
-    result_pop_user3 = pr.recommend('A18YMFFJW974QS')
-    st.write(result_pop_user3)
-    st.write(display_side_by_side([result_pop_user1, result_pop_user2, result_pop_user3]))
 
-    '''pred_ratings = []
-    ratings = pd.DataFrame(train_data.groupby(item_id)['Rating'].mean())
+    pred_ratings = []
+    ratings = pd.DataFrame(electronics.groupby('productId')['Rating'].mean())
     for data in test_data.values:
         item_id = data[1]
         user_rating = ratings.get(item_id, 0)  # Default to np.nan if item_id is not found
         pred_ratings.append(user_rating)
+    
+    #st.write("Type of test_data['Rating']:", type(test_data['Rating']))
+    #st.write("Type of pred_ratings:", type(pred_ratings))
 
-        st.write("Type of test_data['Rating']:", type(test_data['Rating']))
-        st.write("Type of pred_ratings:", type(pred_ratings))
+    st.write("Length of test_data['Rating']:", len(test_data['Rating']))
+    st.write("Length of pred_ratings:", len(pred_ratings))
 
-        st.write("Length of test_data['Rating']:", len(test_data['Rating']))
-        st.write("Length of pred_ratings:", len(pred_ratings))
+    # Let's check the first few entries to see if they are scalar values
+    st.write("First few actual ratings:", test_data['Rating'].head())
+    #st.write("First few predicted ratings:", pred_ratings[:5])
 
-        # Let's check the first few entries to see if they are scalar values
-        st.write("First few actual ratings:", test_data['Rating'].head())
-        st.write("First few predicted ratings:", pred_ratings[:5])
+    # Ensure pred_ratings is indeed a flat list
+    pred_ratings = np.array(pred_ratings).flatten()
+    st.write("Shape of flattened pred_ratings:", pred_ratings.shape)
 
-        # Ensure pred_ratings is indeed a flat list
-        pred_ratings = np.array(pred_ratings).flatten()
-        st.write("Shape of flattened pred_ratings:", pred_ratings.shape)
-
-        # Now let's try calling mean_squared_error again
-        mse = mean_squared_error(test_data['Rating'], pred_ratings)'''
+    # Now let's try calling mean_squared_error again
+    mse = mean_squared_error(test_data['Rating'], pred_ratings)
     
     st.write(pr.predict_evaluate())
 
+def notebook_cell_12():
+    from surprise import accuracy
+    from surprise.model_selection.validation import cross_validate
+    from surprise.dataset import Dataset
+    from surprise.reader import Reader
+    from surprise import SVD
+    from surprise import KNNBasic
+    from surprise import KNNWithMeans
+    reader = Reader()
+    surprise_data = Dataset.load_from_df(electronics, reader)
+
+    from surprise.model_selection import train_test_split
+    trainset, testset = train_test_split(surprise_data, test_size=.3, random_state=10)
+
+    from collections import defaultdict
+
+    def get_top_n(predictions, n=10):
+        # First map the predictions to each user.
+        top_n = defaultdict(list)
+        for uid, iid, true_r, est, _ in predictions:
+            top_n[uid].append((iid, est))
+
+        # Then sort the predictions for each user and retrieve the k highest ones.
+        for uid, user_ratings in top_n.items():
+            user_ratings.sort(key=lambda x: x[1], reverse=True)
+            top_n[uid] = user_ratings[:n]
+
+        return top_n
+    
+    class collab_filtering_based_recommender_model():
+        def __init__(self, model, trainset, testset, data):
+            self.model = model
+            self.trainset = trainset
+            self.testset = testset
+            self.data = data
+            self.pred_test = None
+            self.recommendations = None
+            self.top_n = None
+            self.recommenddf = None
+
+        def fit_and_predict(self):
+            printmd('**Fitting the train data...**', color='brown')
+            self.model.fit(self.trainset)
+
+            printmd('**Predicting the test data...**', color='brown')
+            self.pred_test = self.model.test(self.testset)
+            rmse = round(accuracy.rmse(self.pred_test), 3)
+            printmd('**RMSE for the predicted result is ' + str(rmse) + '**', color='brown')
+
+            self.top_n = get_top_n(self.pred_test)
+            self.recommenddf = pd.DataFrame(columns=['userId', 'productId', 'Rating'])
+            for item in self.top_n:
+                subdf = pd.DataFrame(self.top_n[item], columns=['productId', 'Rating'])
+                subdf['userId'] = item
+                cols = subdf.columns.tolist()
+                cols = cols[-1:] + cols[:-1]
+                subdf = subdf[cols]
+                self.recommenddf = pd.concat([self.recommenddf, subdf], axis = 0)
+            return rmse
+
+        def cross_validate(self):
+            printmd('**Cross Validating the data...**', color='brown')
+            cv_result = cross_validate(self.model, self.data, n_jobs=-1)
+            cv_result = round(cv_result['test_rmse'].mean(),3)
+            printmd('**Mean CV RMSE is ' + str(cv_result)  + '**', color='brown')
+            return cv_result
+
+        def recommend(self, user_id, n=5):
+            printmd('**Recommending top ' + str(n)+ ' products for userid : ' + user_id + ' ...**', color='brown')
+
+            #df = pd.DataFrame(self.top_n[user_id], columns=['productId', 'Rating'])
+            #df['UserId'] = user_id
+            #cols = df.columns.tolist()
+            #cols = cols[-1:] + cols[:-1]
+            #df = df[cols].head(n)
+            df = self.recommenddf[self.recommenddf['userId'] == user_id].head(n)
+            display(df)
+            return df
+    from surprise.model_selection import RandomizedSearchCV
+
+    def find_best_model(model, parameters,data):
+        clf = RandomizedSearchCV(model, parameters, n_jobs=-1, measures=['rmse'])
+        clf.fit(data)
+        print(clf.best_score)
+        print(clf.best_params)
+        print(clf.best_estimator)
+        return clf
+    
+    st.write('KNN With Means - Memory Based Collaborative Filtering')
+
+    sim_options = {
+    "name": ["msd", "cosine", "pearson", "pearson_baseline"],
+    "min_support": [3, 4, 5],
+    "user_based": [True],
+    }
+    params = { 'k': range(30,50,1), 'sim_options': sim_options}
+    clf = find_best_model(KNNWithMeans, params, surprise_data)
+    knnwithmeans = clf.best_estimator['rmse']
+    col_fil_knnwithmeans = collab_filtering_based_recommender_model(knnwithmeans, trainset, testset, surprise_data)
+    knnwithmeans_rmse = col_fil_knnwithmeans.fit_and_predict()
+    st.write(knnwithmeans_rmse)
+    knnwithmeans_cv_rmse = col_fil_knnwithmeans.cross_validate()
+    st.write(knnwithmeans_cv_rmse)
+
+    result_knn_user1 = col_fil_knnwithmeans.recommend(user_id=user_input2, n=5)
+    st.write(result_knn_user1)
+
+    st.write('SVD - Model Based Collaborative Filtering')
+    params= {
+    "n_epochs": [5, 10, 15, 20],
+    "lr_all": [0.002, 0.005],
+    "reg_all": [0.4, 0.6]
+    }
+    clf = find_best_model(SVD, params, surprise_data)
+    svd = clf.best_estimator['rmse']
+    col_fil_svd = collab_filtering_based_recommender_model(svd, trainset, testset, surprise_data)
+
+    svd_rmse = col_fil_svd.fit_and_predict()
+    st.write(svd_rmse)
+    svd_cv_rmse = col_fil_svd.cross_validate()
+    st.write(svd_cv_rmse)
+
+    result_svd_user1 = col_fil_svd.recommend(user_id=user_input2, n=5)
+    st.write(result_svd_user1)
+
+
 st.markdown("<hr></hr>", unsafe_allow_html=True)
 
+
+user_input1 = st.text_input("Enter User ID for PR Model:")
 if st.button('Run Popularity Based Recommender Model'):
     notebook_cell_11()
+
+st.markdown("<hr></hr>", unsafe_allow_html=True)
+
+
+user_input2 = st.text_input("Enter User ID for CFR Model:")
+if st.button('Run Collaborative Filtering Recommender Model'):
+    notebook_cell_12()
