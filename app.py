@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings('ignore')
 import pandas as pd
+import mysql.connector
+from mysql.connector import Error
 
 import ydata_profiling as pp
 import matplotlib.pyplot as plt
@@ -26,6 +28,65 @@ from io import StringIO
 #setting up for customized printing
 from IPython.display import Markdown, display
 from IPython.display import HTML
+
+
+
+
+
+
+
+# Establishing a connection
+try:
+    conn = mysql.connector.connect(
+        host='localhost',
+        database='dsp_rows',
+        user='root',
+        password=''
+    )
+
+    #cursor = conn.cursor(buffered=True)
+    #cursor.execute("SELECT * FROM ratings;")
+    query = "SELECT * FROM ratings;"
+    electronics = pd.read_sql_query(query, conn)
+    #st.write(type(electronics))
+
+
+    #for row in cursor.fetchall():
+    #    st.write(row)
+
+    #cursor.close()
+    conn.close()
+
+except Error as e:
+    st.write("Error while connecting to MySQL", e)
+finally:
+    if conn.is_connected():
+        cursor.close()
+        conn.close()
+        st.write("MySQL connection is closed")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 st.set_option('deprecation.showPyplotGlobalUse', False)
 
@@ -71,12 +132,12 @@ def scatterplot(rowFeature, colFeature, data):
     plot.set_ylabel(colFeature,fontsize=20)
 
 import numpy as np
-electronics = '/Users/sumukharadhya/Downloads/ratings_Electronics.csv'
+#electronics = '/Users/sumukharadhya/Downloads/ratings_Electronics.csv'
 
 import pandas as pd
 import io
 #filename = list(electronics.keys())[0]
-electronics = pd.read_csv(electronics, names=['userId', 'productId', 'Rating','timestamp'], header=None)
+#electronics = pd.read_csv(electronics, names=['userId', 'productId', 'Rating','timestamp'], header=None)
 
 # Now the 'electronics' DataFrame should be the same as if you had read it from the local file 'ratings_Electronics.csv'
 print(electronics.head())
@@ -276,7 +337,15 @@ def notebook_cell_11():
     st.write(result_pop_user1)
 
     pred_ratings = []
+    #ratings = pd.DataFrame(electronics.groupby('productId')['Rating'].mean())
+    electronics['Rating'] = pd.to_numeric(electronics['Rating'], errors='coerce')
+
+    # Handle NaN values (either fill or drop)
+    electronics['Rating'].fillna(0, inplace=True)
+
+    # Group by productId and calculate mean
     ratings = pd.DataFrame(electronics.groupby('productId')['Rating'].mean())
+
     for data in test_data.values:
         item_id = data[1]
         user_rating = ratings.get(item_id, 0)  # Default to np.nan if item_id is not found
@@ -299,7 +368,7 @@ def notebook_cell_11():
     # Now let's try calling mean_squared_error again
     mse = mean_squared_error(test_data['Rating'], pred_ratings)
     
-    st.write(pr.predict_evaluate())
+    #st.write(pr.predict_evaluate())
 
 def notebook_cell_12():
     from surprise import accuracy
